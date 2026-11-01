@@ -230,7 +230,6 @@
 <div class="wrap">
   <div class="topbar">
     <button id="searchOpenBtn">Ort suchen</button>
-    <button id="themeBtn">☀️ Hell</button>
   </div>
   <div class="header" id="header"></div>
   <div class="status" id="status">Wetterdaten werden geladen …</div>
@@ -275,31 +274,6 @@
 <script>
 (function () {
   "use strict";
-
-  // ---------- Theme ----------
-  var themeBtn = document.getElementById("themeBtn");
-  function phaseIcon() {
-    var h = new Date().getHours();
-    if (h < 5) return "🌙";
-    if (h < 8) return "🌅";
-    if (h < 17) return "☀️";
-    if (h < 21) return "🌇";
-    return "🌙";
-  }
-  function updateThemeBtn() {
-    // Icon passt sich der Tageszeit an, Wort zeigt die Aktion (Umschalten)
-    themeBtn.textContent = phaseIcon() + " " + (document.body.classList.contains("light") ? "Dunkel" : "Hell");
-  }
-  function setTheme(mode) {
-    document.body.classList.toggle("light", mode === "light");
-    try { localStorage.setItem("wx-theme", mode); } catch(e){}
-    updateThemeBtn();
-  }
-  themeBtn.addEventListener("click", function () {
-    setTheme(document.body.classList.contains("light") ? "dark" : "light");
-  });
-  try { setTheme(localStorage.getItem("wx-theme") || "dark"); } catch(e){ setTheme("dark"); }
-  setInterval(updateThemeBtn, 60000);
 
   // ---------- WMO-Codes ----------
   var ICONS = {
@@ -592,7 +566,7 @@
   }
 
   // ---------- Regenradar: eigene Seite (RainViewer-Kacheln + Windy) ----------
-  var radarState = { frames: [], idx: 0, playing: null, z: 6 };
+  var radarState = { frames: [], idx: 0, playing: null, z: 9 };  // Zoom 9 ≈ 50 km Umkreis
   var radarPage = document.getElementById("radarPage");
 
   function tileGrid(url, cls) {
@@ -649,11 +623,16 @@
     document.getElementById("rNext").addEventListener("click", function () { stopPlay(); radarState.idx = Math.min(radarState.frames.length - 1, radarState.idx + 1); drawRadarFrame(); });
     document.getElementById("rNow").addEventListener("click", function () { stopPlay(); radarState.idx = Math.max(0, radarState.frames.length - 2); drawRadarFrame(); });
     document.getElementById("zIn").addEventListener("click", function () {
-      radarState.z = Math.min(9, radarState.z + 1); drawRadarFrame();
+      radarState.z = Math.min(11, radarState.z + 1); redrawRadar();
     });
     document.getElementById("zOut").addEventListener("click", function () {
-      radarState.z = Math.max(4, radarState.z - 1); drawRadarFrame();
+      radarState.z = Math.max(7, radarState.z - 1); redrawRadar();
     });
+  }
+
+  function redrawRadar() {
+    if (state.radarLive && radarState.frames.length) drawRadarFrame();
+    else drawRadarDemo();
   }
 
   // Radar-Seite öffnen/schließen
@@ -717,35 +696,40 @@
     if (btn) btn.textContent = "▶️ Animation";
   }
 
-  // Demo-Radar: stilisierte Karte mit Straßen + animierte Regenwolken
+  // Demo-Radar: stilisierte Karte mit Straßen + animierte Regenwolken (zoombar)
+  var demoTimer = null;
   function drawRadarDemo() {
     var box = document.getElementById("radarBox");
     if (!box) return;
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
     box.style.background = "#e8e4da";
     box.innerHTML = "<canvas id='radarCv'></canvas><div class='radar-pin'>📍</div>";
     var cv = document.getElementById("radarCv");
     cv.width = 512; cv.height = 384;
     var ctx = cv.getContext("2d");
+    var s = Math.pow(2, radarState.z - 9); // Zoom für die Demo-Ansicht
     var cols = ["#7ef77e","#2ec92e","#1c9bd1","#1a3fd6","#9b2ec9","#e33b16"];
     var blobs = [];
     for (var i=0;i<6;i++) {
-      blobs.push({ x: 60+Math.random()*392, y: 40+Math.random()*300, r: 22+Math.random()*40,
+      blobs.push({ x: 60+Math.random()*392, y: 40+Math.random()*300, r: (22+Math.random()*40)*s,
         c: cols[Math.floor(Math.random()*4)], a: .25+Math.random()*.3, vx: (Math.random()-.5)*.6, vy: .2+Math.random()*.3 });
     }
     function frame() {
-      if (!document.getElementById("radarCv")) { clearInterval(timer); return; }
+      if (!document.getElementById("radarCv")) { clearInterval(demoTimer); demoTimer = null; return; }
       // Kartenuntergrund
       ctx.fillStyle = "#e8e4da"; ctx.fillRect(0,0,512,384);
       ctx.fillStyle = "#d5d0c4";
-      for (var i=0;i<26;i++) { var bx=(i*97)%512, by=(i*57)%384;
-        ctx.fillRect(bx, by, 30+ (i%5)*9, 20+(i%3)*8); }
+      var sp = 40 * s;
+      for (var bx=-sp; bx<512; bx+=sp) for (var by=-sp; by<384; by+=sp) {
+        ctx.fillRect(bx + ((by/sp)%2)*(sp/2), by, sp*.6, sp*.45);
+      }
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 5;
-      for (var i=0;i<5;i++) { ctx.beginPath(); ctx.moveTo(0, 50+i*72); ctx.lineTo(512, 90+i*60); ctx.stroke(); }
-      for (var i=0;i<4;i++) { ctx.beginPath(); ctx.moveTo(60+i*130, 0); ctx.lineTo(120+i*120, 384); ctx.stroke(); }
+      for (var i=0;i<5;i++) { ctx.beginPath(); ctx.moveTo(0, 50+i*72*s); ctx.lineTo(512, 90+i*60*s); ctx.stroke(); }
+      for (var i=0;i<4;i++) { ctx.beginPath(); ctx.moveTo(60+i*130*s, 0); ctx.lineTo(120+i*120*s, 384); ctx.stroke(); }
       ctx.strokeStyle = "#ffd9d9"; ctx.lineWidth = 10;
       ctx.beginPath(); ctx.moveTo(0,300); ctx.bezierCurveTo(170,280,340,330,512,290); ctx.stroke();
       // Ort
-      ctx.fillStyle = "#c23a3a"; ctx.beginPath(); ctx.arc(256,192,7,0,7); ctx.fill();
+      ctx.fillStyle = "#c23a3a"; ctx.beginPath(); ctx.arc(256,192,7*s,0,7); ctx.fill();
       // Regenwolken (animiert)
       blobs.forEach(function (b) {
         b.x += b.vx; b.y += b.vy;
@@ -758,10 +742,13 @@
       });
       ctx.globalAlpha = 1;
     }
-    var timer = setInterval(frame, 120);
+    demoTimer = setInterval(frame, 120);
     frame();
     var te = document.getElementById("radarTime");
-    if (te && !state.radarLive) te.textContent = "Demo-Karte – live mit echter OSM-Karte, sobald gehostet";
+    if (te) {
+      var km = round(30 / s * 1.6);
+      te.textContent = state.radarLive ? "" : ("Demo-Karte · Zoomstufe " + radarState.z + " (≈ " + km + " km Umkreis) – live mit echter OSM-Karte, sobald gehostet");
+    }
   }
 
   // ---------- Slide-in Ortssuche + Favoriten ----------
@@ -929,7 +916,22 @@
     }, "Bonn", false);
   }
 
-  load(50.73, 7.10, "Bonn");
+  // ---------- Start: immer aktueller Standort, sonst Bonn ----------
+  function startUp() {
+    if (!navigator.geolocation) { load(50.73, 7.10, "Bonn"); return; }
+    statusEl.textContent = "Standort wird ermittelt …";
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      load(pos.coords.latitude, pos.coords.longitude, "Mein Standort");
+      fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + pos.coords.latitude + "&longitude=" + pos.coords.longitude + "&localityLanguage=de")
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if (j && j.city) { state.place = j.city; render(); } })
+        .catch(function(){});
+    }, function () {
+      statusEl.textContent = "Standort nicht verfügbar – Bonn als Standard.";
+      load(50.73, 7.10, "Bonn");
+    }, { timeout: 8000 });
+  }
+  startUp();
 })();
 </script>
 <script>

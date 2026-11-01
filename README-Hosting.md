@@ -1,47 +1,21 @@
 # Wetter-App als PWA hosten (kostenlos)
 
-Diese Dateien hochladen – fertig ist deine Wetter-App:
+Dateien hochladen – fertig ist die App (index.html, manifest.webmanifest, sw.js, icons/).
 
-```
-index.html               → die App selbst (Ortssuche, Favoriten, Tages-Details, Radar-Seite)
-manifest.webmanifest     → macht sie installierbar (Name, Icon, Farben)
-sw.js                    → Offline-Cache (App startet auch ohne Netz)
-icons/                   → App-Icons (192/512 px + apple-touch-icon)
-```
+## Hosting (alle kostenlos)
+- **Netlify Drop:** https://app.netlify.com/drop → gesamten Ordner hineinziehen
+- **Cloudflare Pages:** Workers & Pages → Create → Pages → Upload assets
+- **GitHub Pages:** public Repo, Dateien hochladen, Settings → Pages → Deploy from a branch (main)
 
-## Variante A: Netlify Drop (am schnellsten, ~2 Minuten)
-
-1. Gehe zu **https://app.netlify.com/drop**
-2. Ziehe den **gesamten Ordner** per Drag & Drop hinein
-3. Adresse: `https://xyz.netlify.app`
-
-## Variante B: Cloudflare Pages
-
-**https://dash.cloudflare.com** → *Workers & Pages* → *Create* → *Pages* → *Upload assets*
-Adresse: `https://<projekt>.pages.dev`
-
-## Variante C: GitHub Pages
-
-Neues Repo (public) → Dateien hochladen → *Settings → Pages* → *Deploy from a branch* → `main`
-
-## Auf dem iPhone installieren
-
-1. Adresse in **Safari** öffnen
-2. Teilen → **„Zum Home-Bildschirm"**
-3. App startet ab sofort mit eigenem Icon im Vollbild
+## iPhone-Installation
+Safari öffnen → Teilen → „Zum Home-Bildschirm" → App startet mit eigenem Icon im Vollbild.
 
 ## Funktionen
+- Startet immer mit dem **aktuellen Standort** (GPS; ohne Erlaubnis Fallback Bonn)
+- Ortssuche-Panel von rechts mit automatischen Favoriten (bis 8, gespeichert)
+- Tages-Details in der 10-Tage-Vorhersage (Regen, Wind, UV, Sonne, Stundenverlauf)
+- Radar-Seite von rechts: „Karte + Radar" (OSM + RainViewer, Standard ≈ 50 km Umkreis,
+  zoombar) und „Interaktiv (Windy)" mit DWD-Radardaten für Deutschland
+- Hintergrund passt sich Tageszeit und Wetter an (animierter Regen/Schnee)
 
-- **Ortssuche:** Panel öffnet sich von rechts; Suche startet beim Tippen (Enter beschleunigt).
-  Ergebnisse und GPS-Standort wandern automatisch in die ⭐ Favoriten (bis 8, bleiben gespeichert).
-- **Tages-Details:** Tag in der 10-Tage-Vorhersage antippen → Details mit Regen, Wind, UV,
-  Sonnenauf-/untergang und Stundenverlauf.
-- **📡 Radar-Seite:** Klick auf „Radar" öffnet eine große Seite von rechts mit zwei Ansichten:
-  - *Karte + Radar*: OpenStreetMap-Karte mit RainViewer-Radar-Overlay, Zoom-Buttons,
-    Zeitanimation (letzte 2 Stunden + Prognose)
-  - *Interaktiv (Windy)*: eingebettete Windy-Karte mit Regen-Overlay (für Deutschland
-    u. a. DWD-Radardaten), frei zoom- und schwenkbar
-- **Hintergrund:** passt sich Tageszeit und Wetter an; animierter Regen/Schnee.
-
-**Hinweis:** In der Vorschau/Canvas-Umgebung sind Netzwerkaufrufe blockiert – dort laufen
-Demodaten und eine stilisierte Demo-Karte. Live gehostet funktioniert alles.
+In der Canvas-Vorschau sind Netzwerkaufrufe blockiert (Demodaten); live gehostet funktioniert alles.
