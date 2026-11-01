@@ -1,22 +1,34 @@
-# Wetter-App als PWA hosten (kostenlos)
+# Wetter-App – Hosting-Paket
 
-Dateien hochladen – fertig ist die App (index.html, manifest.webmanifest, sw.js, icons/).
+Inhalt: index.html (die App), manifest.webmanifest, sw.js (Offline-Cache),
+icons/ (App-Icons für iPhone/Home-Bildschirm).
 
-## Hosting (alle kostenlos)
-- **Netlify Drop:** https://app.netlify.com/drop → gesamten Ordner hineinziehen
-- **Cloudflare Pages:** Workers & Pages → Create → Pages → Upload assets
-- **GitHub Pages:** public Repo, Dateien hochladen, Settings → Pages → Deploy from a branch (main)
+## Hosting (kostenlos, HTTPS – nötig für Standort & Installation)
 
-## iPhone-Installation
-Safari öffnen → Teilen → „Zum Home-Bildschirm" → App startet mit eigenem Icon im Vollbild.
+### Netlify Drop (am schnellsten)
+1. https://app.netlify.com/drop öffnen
+2. Den Ordner mit allen Dateien hineinziehen
+3. Fertig – die App läuft sofort unter einer https-Adresse
 
-## Funktionen
-- Startet immer mit dem **aktuellen Standort** (GPS; ohne Erlaubnis Fallback Bonn)
-- Ortssuche-Panel von rechts mit automatischen Favoriten (bis 8, gespeichert)
-- Tages-Details in der 10-Tage-Vorhersage (Regen, Wind, UV, Sonne, Stundenverlauf)
-- **Radar-Seite** (Klick auf „Radar", slidet von rechts): Regenradar HD+ von
-  kachelmannwetter.com – automatisch in der passenden Region deines Ortes
-  (16 Bundesländer, Stadtstaaten einzeln; außerhalb Deutschlands: Gesamtansicht)
-- Hintergrund passt sich Tageszeit und Wetter an (animierter Regen/Schnee)
+### Cloudflare Pages
+1. cloudflare.com → Konto anlegen → Pages → Projekt erstellen
+2. Ordner hochladen (Direct Upload)
 
-In der Canvas-Vorschau sind Netzwerkaufrufe blockiert (Demodaten); live gehostet funktioniert alles.
+### GitHub Pages
+1. Neues Repository, Dateien hochladen (index.html im Hauptordner!)
+2. Settings → Pages → Source: main → Save
+
+## Auf dem iPhone installieren (als App)
+1. Die gehostete Adresse in Safari öffnen
+2. Teilen-Button → „Zum Home-Bildschirm"
+3. App-Icon erscheint auf dem Home-Bildschirm, startet im Vollbild
+
+## Datenquellen
+- Vorhersage: Open-Meteo – kostenlos, ohne API-Key
+- Regenradar: DWD-RADOLAN via BrightSky (api.brightsky.dev) – kostenlos,
+  zentriert auf deinen Ort, ca. 50 km Umkreis, 5-Minuten-Schritte
+  (letzte Stunden Rückblick + 2 Stunden Vorhersage)
+
+## Hinweise
+- Beim ersten Start fragt iOS nach dem Standort – erlauben
+- Kein Server/Backend nötig, alles läuft im Browser

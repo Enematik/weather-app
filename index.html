@@ -7,9 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#0a0a0a" />
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Wetter">
 <title>Wetter</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -204,7 +207,7 @@
   <div class="header" id="header"></div>
   <div class="status" id="status">Wetterdaten werden geladen …</div>
   <div id="content"></div>
-  <footer>Daten: Open-Meteo.com · Radar: kachelmannwetter.com</footer>
+  <footer>Daten: Open-Meteo.com · Radar: DWD via BrightSky</footer>
 </div>
 
 <!-- Slide-in Ortssuche -->
@@ -230,11 +233,7 @@
 <!-- Radar-Großansicht -->
 <div class="radar-page" id="radarPage">
   <div class="rp-top"><h2>📡 Regenradar</h2><button class="rp-close" id="radarClose">✕ Schließen</button></div>
-  <div id="radarMount">
-    <iframe class="windy-frame" id="kmFrame" title="Kachelmannwetter Regenradar"></iframe>
-    <div class="rp-note" id="kmRegion"></div>
-    <div class="rp-note">Regenradar HD+ von kachelmannwetter.com – automatisch passend zur Region deines Ortes, mit Animation über die letzten Stunden. Ohne Karte: Die Umgebung blockiert externe Inhalte.</div>
-  </div>
+  <div id="radarMount"></div>
 </div>
 
 <script>
@@ -531,50 +530,175 @@
     document.getElementById("mClose").addEventListener("click", closeDay);
   }
 
-  // ---------- Regenradar: Kachelmannwetter, Regionsansicht ----------
+  // ---------- Regenradar: DWD-Radarnowcast via BrightSky ----------
   var radarPage = document.getElementById("radarPage");
-  var kmFrame = document.getElementById("kmFrame");
-  var kmRegionLabel = document.getElementById("kmRegion");
+  var rbs = { frames: [], w: 101, h: 101, pos: null, idx: 0, timer: null, live: false, demoTimer: null };
 
-  // Regionen von kachelmannwetter.com (slug, Name, latMin, latMax, lonMin, lonMax)
-  var KM_REGIONS = [
-    ["berlin", "Berlin", 52.3, 52.75, 13.05, 13.8],
-    ["hamburg", "Hamburg", 53.3, 53.95, 9.6, 10.4],
-    ["bremen", "Bremen", 53.0, 53.65, 8.4, 9.0],
-    ["saarland", "Saarland", 49.1, 49.65, 6.3, 7.2],
-    ["schleswig-holstein", "Schleswig-Holstein", 53.35, 55.15, 8.0, 11.5],
-    ["mecklenburg-vorpommern", "Mecklenburg-Vorpommern", 53.0, 54.75, 10.5, 14.6],
-    ["niedersachsen", "Niedersachsen", 51.3, 53.95, 6.4, 11.7],
-    ["nordrhein-westfalen", "Nordrhein-Westfalen", 50.3, 52.6, 5.8, 9.6],
-    ["hessen", "Hessen", 49.3, 51.7, 7.7, 10.3],
-    ["rheinland-pfalz", "Rheinland-Pfalz", 48.9, 51.0, 6.0, 8.6],
-    ["baden-wuerttemberg", "Baden-Württemberg", 47.5, 49.9, 7.4, 10.6],
-    ["bayern", "Bayern", 47.2, 50.7, 8.9, 14.0],
-    ["sachsen-anhalt", "Sachsen-Anhalt", 50.9, 53.1, 10.5, 13.3],
-    ["brandenburg", "Brandenburg", 51.2, 53.7, 11.2, 14.95],
-    ["sachsen", "Sachsen", 50.1, 51.7, 11.7, 15.1],
-    ["thueringen", "Thüringen", 50.2, 51.7, 9.8, 12.2]
-  ];
-  function kmRegionFor(lat, lon) {
-    for (var i = 0; i < KM_REGIONS.length; i++) {
-      var r = KM_REGIONS[i];
-      if (lat >= r[2] && lat <= r[3] && lon >= r[4] && lon <= r[5]) return r;
-    }
-    return null; // außerhalb Deutschlands -> Deutschland-Ansicht
+  async function inflateB64(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var ds = new DecompressionStream("deflate");
+    var buf = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+    return new Uint16Array(buf);
   }
+
+  // Farbskala: Wert in 0,01 mm pro 5 Minuten
+  function rainColor(v) {
+    if (!v || v >= 4096) return [0, 0, 0, 0]; // 0 = trocken, >= 4096 = keine Daten
+    if (v < 10)  return [126, 247, 126, 150];
+    if (v < 25)  return [46, 201, 46, 175];
+    if (v < 50)  return [28, 155, 209, 195];
+    if (v < 100) return [26, 63, 214, 215];
+    if (v < 200) return [155, 46, 201, 230];
+    if (v < 400) return [227, 59, 22, 240];
+    return [255, 209, 46, 248];
+  }
+
+  function renderRadar() {
+    var mount = document.getElementById("radarMount");
+    mount.innerHTML = "<div class='radar-box' id='radarBox'><canvas id='radarCv'></canvas><div class='radar-pin'>📍</div></div>" +
+      "<div class='radar-time' id='radarTime'>Radar wird geladen …</div>" +
+      "<div class='radar-ctrl'>" +
+        "<button id='rPlay'>▶️ Abspielen</button>" +
+        "<button id='rPrev'>◀ 5 Min</button>" +
+        "<button id='rNext'>5 Min ▶</button>" +
+        "<button id='rNow'>Jetzt</button>" +
+      "</div>" +
+      "<div class='radar-legend'>" +
+        "<span style='background:#7ef77e'></span><span style='background:#2ec92e'></span>" +
+        "<span style='background:#1c9bd1'></span><span style='background:#1a3fd6'></span>" +
+        "<span style='background:#9b2ec9'></span><span style='background:#e33b16'></span>" +
+        "<span style='background:#ffd12e'></span>" +
+      "</div>" +
+      "<div class='rp-note'>Niederschlagsradar des DWD (RADOLAN, via BrightSky) · Umkreis ≈ 50 km um deinen Ort · 5-Minuten-Schritte: letzte Stunden im Rückblick, dazu 2 Stunden Vorhersage</div>";
+    document.getElementById("rPlay").addEventListener("click", toggleRadarPlay);
+    document.getElementById("rPrev").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.max(0, rbs.idx - 1); drawRadarFrame(); });
+    document.getElementById("rNext").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.min(rbs.frames.length - 1, rbs.idx + 1); drawRadarFrame(); });
+    document.getElementById("rNow").addEventListener("click", function () { stopRadarPlay(); jumpToNow(); drawRadarFrame(); });
+
+    var url = "https://api.brightsky.dev/radar?lat=" + state.lat.toFixed(4) +
+      "&lon=" + state.lon.toFixed(4) + "&distance=50000&tz=Europe/Berlin";
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.radar || !j.radar.length) throw new Error("no frames");
+        var top = j.bbox[0], left = j.bbox[1], bottom = j.bbox[2], right = j.bbox[3];
+        rbs.w = right - left + 1;
+        rbs.h = bottom - top + 1;
+        rbs.pos = j.latlon_position || { x: rbs.w / 2, y: rbs.h / 2 };
+        var jobs = j.radar.map(function (rec) {
+          return inflateB64(rec.precipitation_5).then(function (vals) {
+            return { ts: new Date(rec.timestamp).getTime(), vals: vals };
+          });
+        });
+        return Promise.all(jobs);
+      })
+      .then(function (frames) {
+        rbs.frames = frames;
+        rbs.live = true;
+        jumpToNow();
+        drawRadarFrame();
+      })
+      .catch(function () { radarDemo(); });
+  }
+
+  function jumpToNow() {
+    var now = Date.now();
+    rbs.idx = 0;
+    for (var i = 0; i < rbs.frames.length; i++) if (rbs.frames[i].ts <= now) rbs.idx = i;
+  }
+
+  function drawRadarFrame() {
+    var box = document.getElementById("radarBox");
+    if (!box) return;
+    var cv = document.getElementById("radarCv");
+    var ctx = cv.getContext("2d");
+    var w = rbs.w, h = rbs.h;
+    cv.width = w; cv.height = h;
+    var f = rbs.frames[rbs.idx];
+    if (f) {
+      var img = ctx.createImageData(w, h);
+      for (var i = 0; i < w * h; i++) {
+        var c = rainColor(f.vals[i] || 0);
+        img.data[i*4] = c[0]; img.data[i*4+1] = c[1]; img.data[i*4+2] = c[2]; img.data[i*4+3] = c[3];
+      }
+      ctx.putImageData(img, 0, 0);
+    } else {
+      ctx.clearRect(0, 0, w, h);
+    }
+    var pin = box.querySelector(".radar-pin");
+    if (pin && rbs.pos) {
+      pin.style.left = (100 * rbs.pos.x / w) + "%";
+      pin.style.top = (100 * rbs.pos.y / h) + "%";
+    }
+    var timeEl = document.getElementById("radarTime");
+    if (timeEl && f) {
+      var d = new Date(f.ts);
+      var lbl = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr";
+      var mins = Math.round((f.ts - Date.now()) / 60000);
+      if (mins > 5) timeEl.textContent = "Vorhersage für " + lbl + " (+" + mins + " Min)";
+      else if (mins < -5) timeEl.textContent = "Rückblick: " + lbl;
+      else timeEl.textContent = "Jetzt: " + lbl;
+    }
+  }
+
+  function toggleRadarPlay() {
+    if (rbs.timer) { stopRadarPlay(); return; }
+    document.getElementById("rPlay").textContent = "⏸️ Stopp";
+    rbs.timer = setInterval(function () {
+      rbs.idx = (rbs.idx + 1) % rbs.frames.length;
+      drawRadarFrame();
+    }, 400);
+  }
+  function stopRadarPlay() {
+    if (rbs.timer) { clearInterval(rbs.timer); rbs.timer = null; }
+    var b = document.getElementById("rPlay");
+    if (b) b.textContent = "▶️ Abspielen";
+  }
+
+  // Fallback: animierte Demo-Ansicht, wenn die API nicht erreichbar ist
+  function radarDemo() {
+    var box = document.getElementById("radarBox");
+    if (!box) return;
+    if (rbs.demoTimer) { clearInterval(rbs.demoTimer); rbs.demoTimer = null; }
+    var cv = document.getElementById("radarCv");
+    cv.width = 256; cv.height = 256;
+    var ctx = cv.getContext("2d");
+    var cols = ["#7ef77e","#2ec92e","#1c9bd1","#1a3fd6","#9b2ec9","#e33b16"];
+    var blobs = [];
+    for (var i = 0; i < 7; i++) {
+      blobs.push({ x: Math.random()*256, y: Math.random()*256, r: 12+Math.random()*30,
+        c: cols[Math.floor(Math.random()*5)], a: .3+Math.random()*.3,
+        vx: (Math.random()-.5)*.8, vy: .3+Math.random()*.5 });
+    }
+    rbs.demoTimer = setInterval(function () {
+      ctx.fillStyle = "#0e0f16"; ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = "rgba(255,255,255,.06)";
+      for (var g = 0; g <= 256; g += 32) {
+        ctx.beginPath(); ctx.moveTo(g, 0); ctx.lineTo(g, 256); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, g); ctx.lineTo(256, g); ctx.stroke();
+      }
+      blobs.forEach(function (b) {
+        b.x += b.vx; b.y += b.vy;
+        if (b.x < -40) b.x = 296; if (b.x > 296) b.x = -40;
+        if (b.y > 296) b.y = -40;
+        var gr = ctx.createRadialGradient(b.x, b.y, 2, b.x, b.y, b.r);
+        gr.addColorStop(0, b.c); gr.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.globalAlpha = b.a; ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }, 120);
+    var te = document.getElementById("radarTime");
+    if (te) te.textContent = "Demo-Ansicht – live erscheint hier der DWD-Radar via BrightSky";
+  }
+
   function openRadar() {
-    var r = kmRegionFor(state.lat, state.lon);
-    var slug = r ? r[0] : "deutschland";
-    var name = r ? r[1] : "Deutschland";
-    kmRegionLabel.textContent = "Region: " + name;
-    var url = "https://kachelmannwetter.com/de/regenradar/" + slug;
-    if (!kmFrame.src || kmFrame.dataset.slug !== slug) {
-      kmFrame.src = url;
-      kmFrame.dataset.slug = slug;
-    }
     radarPage.classList.add("open");
+    renderRadar();
   }
-  function closeRadar() { radarPage.classList.remove("open"); }
+  function closeRadar() { stopRadarPlay(); radarPage.classList.remove("open"); }
   document.getElementById("radarClose").addEventListener("click", closeRadar);
 
   // ---------- Slide-in Ortssuche + Favoriten ----------
@@ -760,10 +884,9 @@
   startUp();
 })();
 </script>
-<script>
-  if ("serviceWorker" in navigator && location.protocol === "https:") {
-    navigator.serviceWorker.register("sw.js").catch(function(){});
-  }
-</script>
+  <script>
+    if ("serviceWorker" in navigator && location.protocol === "https:")
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+  </script>
 </body>
 </html>
