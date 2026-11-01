@@ -170,6 +170,31 @@
   }
   body.light .panel { background: linear-gradient(170deg, #fff 0%, #f2eaea 100%); }
   .panel.open { transform: translateX(0); }
+
+  /* Radar-Großansicht (eigene Seite, slidet von rechts ein) */
+  .radar-page {
+    position: fixed; inset: 0; z-index: 80;
+    background: linear-gradient(170deg, #1c0d0d 0%, #0d0707 100%);
+    transform: translateX(105%); transition: transform .32s cubic-bezier(.2,.8,.3,1);
+    overflow-y: auto;
+    padding: calc(14px + env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom));
+  }
+  body.light .radar-page { background: linear-gradient(170deg, #fff 0%, #f0e8e8 100%); }
+  .radar-page.open { transform: none; }
+  .radar-page .rp-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .radar-page h2 { font-size: 20px; font-weight: 600; }
+  .radar-page .rp-close { background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 16px; padding: 6px 12px; font-size: 14px; cursor: pointer; }
+  .rp-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .rp-tabs button { flex: 1; padding: 10px 0; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+  .rp-tabs button.active { background: linear-gradient(135deg, var(--accent) 0%, #b3001b 100%); border-color: transparent; }
+  .radar-box.rp { aspect-ratio: 3/4; margin: 0; }
+  .radar-zoom { display: flex; gap: 8px; padding: 8px 16px 4px; }
+  .radar-zoom button { flex: 1; padding: 8px 0; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .windy-frame { width: 100%; aspect-ratio: 3/4; border: 1px solid var(--border); border-radius: 14px; background: #000; }
+  .rp-note { font-size: 12px; color: var(--sub); text-align: center; padding: 8px; line-height: 1.5; }
   .panel h2 { font-size: 20px; font-weight: 600; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
   .panel h2 button { background: var(--card); border: 1px solid var(--border); color: var(--text);
     border-radius: 16px; padding: 5px 11px; font-size: 14px; cursor: pointer; }
@@ -204,7 +229,7 @@
 <canvas id="rainfx"></canvas>
 <div class="wrap">
   <div class="topbar">
-    <button id="searchOpenBtn">🔍 Ort suchen</button>
+    <button id="searchOpenBtn">Ort suchen</button>
     <button id="themeBtn">☀️ Hell</button>
   </div>
   <div class="header" id="header"></div>
@@ -218,8 +243,7 @@
 <aside class="panel" id="panel">
   <h2>Ort suchen <button id="panelClose">✕</button></h2>
   <div class="search-bar">
-    <input id="panelInput" type="search" placeholder="z. B. Berlin" autocomplete="off" />
-    <button class="go" id="panelGo">🔍</button>
+    <input id="panelInput" type="search" placeholder="Ort suchen und Enter drücken …" autocomplete="off" />
   </div>
   <div class="sec-title">Suchergebnisse</div>
   <div class="plist" id="panelResults"></div>
@@ -234,21 +258,48 @@
 <div class="modal-veil" id="modalVeil"></div>
 <div class="modal" id="dayModal"></div>
 
+<!-- Radar-Großansicht -->
+<div class="radar-page" id="radarPage">
+  <div class="rp-top"><h2>📡 Regenradar</h2><button class="rp-close" id="radarClose">✕ Schließen</button></div>
+  <div class="rp-tabs">
+    <button id="tabTiles" class="active">Karte + Radar</button>
+    <button id="tabWindy">Interaktiv (Windy)</button>
+  </div>
+  <div id="radarMount"></div>
+  <div id="windyMount" style="display:none">
+    <iframe class="windy-frame" id="windyFrame" title="Windy Regenradar"></iframe>
+    <div class="rp-note">Interaktive Karte von Windy mit Regen-Overlay (für Deutschland u. a. DWD-Radardaten). Ohne Karte: Die Umgebung blockiert externe Inhalte.</div>
+  </div>
+</div>
+
 <script>
 (function () {
   "use strict";
 
   // ---------- Theme ----------
   var themeBtn = document.getElementById("themeBtn");
+  function phaseIcon() {
+    var h = new Date().getHours();
+    if (h < 5) return "🌙";
+    if (h < 8) return "🌅";
+    if (h < 17) return "☀️";
+    if (h < 21) return "🌇";
+    return "🌙";
+  }
+  function updateThemeBtn() {
+    // Icon passt sich der Tageszeit an, Wort zeigt die Aktion (Umschalten)
+    themeBtn.textContent = phaseIcon() + " " + (document.body.classList.contains("light") ? "Dunkel" : "Hell");
+  }
   function setTheme(mode) {
     document.body.classList.toggle("light", mode === "light");
-    themeBtn.textContent = mode === "light" ? "🌙 Dunkel" : "☀️ Hell";
     try { localStorage.setItem("wx-theme", mode); } catch(e){}
+    updateThemeBtn();
   }
   themeBtn.addEventListener("click", function () {
     setTheme(document.body.classList.contains("light") ? "dark" : "light");
   });
   try { setTheme(localStorage.getItem("wx-theme") || "dark"); } catch(e){ setTheme("dark"); }
+  setInterval(updateThemeBtn, 60000);
 
   // ---------- WMO-Codes ----------
   var ICONS = {
@@ -423,15 +474,7 @@
       "<button data-v='radar' class='" + (state.view==="radar"?"active":"") + "'>📡 Radar</button>" +
       "</div>";
 
-    if (state.view === "radar") {
-      h += "<div class='card'><h3>📡 REGENRADAR</h3><div id='radarMount'></div></div>";
-      contentEl.innerHTML = h;
-      contentEl.querySelectorAll(".switch button").forEach(function (b) {
-        b.addEventListener("click", function () { state.view = b.dataset.v; render(); });
-      });
-      renderRadar();
-      return;
-    }
+    if (state.view === "radar") state.view = "std";
 
     var t = d.hourly, now = Date.now()/1000;
     var i0 = 0;
@@ -491,7 +534,10 @@
 
     contentEl.innerHTML = h;
     contentEl.querySelectorAll(".switch button").forEach(function (b) {
-      b.addEventListener("click", function () { state.view = b.dataset.v; render(); });
+      b.addEventListener("click", function () {
+        if (b.dataset.v === "radar") { openRadar(); return; }
+        state.view = b.dataset.v; render();
+      });
     });
     contentEl.querySelectorAll(".day-row").forEach(function (r) {
       r.addEventListener("click", function () { openDay(parseInt(r.dataset.day, 10)); });
@@ -545,11 +591,12 @@
     document.getElementById("mClose").addEventListener("click", closeDay);
   }
 
-  // ---------- Regenradar (RainViewer + OSM-Karte) ----------
-  var radarState = { frames: [], idx: 0, playing: null };
+  // ---------- Regenradar: eigene Seite (RainViewer-Kacheln + Windy) ----------
+  var radarState = { frames: [], idx: 0, playing: null, z: 6 };
+  var radarPage = document.getElementById("radarPage");
 
-  function tileGrid(url, z, cls) {
-    var n = Math.pow(2, z);
+  function tileGrid(url, cls) {
+    var z = radarState.z, n = Math.pow(2, z);
     var xTile = Math.floor((state.lon + 180) / 360 * n);
     var latR = state.lat * Math.PI / 180;
     var yTile = Math.floor((1 - Math.log(Math.tan(latR) + 1/Math.cos(latR)) / Math.PI) / 2 * n);
@@ -563,7 +610,7 @@
 
   function renderRadar() {
     var mount = document.getElementById("radarMount");
-    mount.innerHTML = "<div class='radar-box' id='radarBox'></div>" +
+    mount.innerHTML = "<div class='radar-box rp' id='radarBox'></div>" +
       "<div class='radar-time' id='radarTime'>Radar wird geladen …</div>" +
       "<div class='radar-ctrl'>" +
         "<button id='rPlay'>▶️ Animation</button>" +
@@ -571,12 +618,17 @@
         "<button id='rNext'>30 Min ▶</button>" +
         "<button id='rNow'>Jetzt</button>" +
       "</div>" +
+      "<div class='radar-zoom'>" +
+        "<button id='zOut'>➖ Herauszoomen</button>" +
+        "<button id='zIn'>➕ Hineinzoomen</button>" +
+      "</div>" +
       "<div class='radar-legend'>" +
         "<span style='background:#7ef77e'></span><span style='background:#2ec92e'></span>" +
         "<span style='background:#1c9bd1'></span><span style='background:#1a3fd6'></span>" +
         "<span style='background:#9b2ec9'></span><span style='background:#e33b16'></span>" +
         "<span style='background:#ffd12e'></span>" +
-      "</div>";
+      "</div>" +
+      "<div class='rp-note'>Basis: OpenStreetMap · Radar: RainViewer</div>";
 
     fetch("https://api.rainviewer.com/public/weather-maps.json")
       .then(function (r) { return r.json(); })
@@ -596,7 +648,40 @@
     document.getElementById("rPrev").addEventListener("click", function () { stopPlay(); radarState.idx = Math.max(0, radarState.idx - 1); drawRadarFrame(); });
     document.getElementById("rNext").addEventListener("click", function () { stopPlay(); radarState.idx = Math.min(radarState.frames.length - 1, radarState.idx + 1); drawRadarFrame(); });
     document.getElementById("rNow").addEventListener("click", function () { stopPlay(); radarState.idx = Math.max(0, radarState.frames.length - 2); drawRadarFrame(); });
+    document.getElementById("zIn").addEventListener("click", function () {
+      radarState.z = Math.min(9, radarState.z + 1); drawRadarFrame();
+    });
+    document.getElementById("zOut").addEventListener("click", function () {
+      radarState.z = Math.max(4, radarState.z - 1); drawRadarFrame();
+    });
   }
+
+  // Radar-Seite öffnen/schließen
+  function openRadar() {
+    radarPage.classList.add("open");
+    renderRadar();
+  }
+  function closeRadar() { stopPlay(); radarPage.classList.remove("open"); }
+  document.getElementById("radarClose").addEventListener("click", closeRadar);
+  document.getElementById("tabTiles").addEventListener("click", function () {
+    document.getElementById("tabTiles").classList.add("active");
+    document.getElementById("tabWindy").classList.remove("active");
+    document.getElementById("radarMount").style.display = "";
+    document.getElementById("windyMount").style.display = "none";
+  });
+  document.getElementById("tabWindy").addEventListener("click", function () {
+    document.getElementById("tabWindy").classList.add("active");
+    document.getElementById("tabTiles").classList.remove("active");
+    document.getElementById("radarMount").style.display = "none";
+    var wm = document.getElementById("windyMount");
+    wm.style.display = "";
+    var wf = document.getElementById("windyFrame");
+    if (!wf.src) {
+      wf.src = "https://embed.windy.com/?lat=" + state.lat.toFixed(2) + "&lon=" + state.lon.toFixed(2) +
+        "&zoom=7&level=surface&overlay=rain&menu=&message=false&marker=&calendar=now&pressure=&type=swell2&location=coordinates&detail=" +
+        state.lat.toFixed(4) + "," + state.lon.toFixed(4);
+    }
+  });
 
   function drawRadarFrame() {
     var box = document.getElementById("radarBox");
@@ -612,8 +697,8 @@
     timeEl.textContent = "Radar " + (new Date(frame.time)).toLocaleString("de-DE", {hour:"2-digit", minute:"2-digit"}) + " Uhr";
     // OpenStreetMap-Karte als Basis + halbtransparentes Radar-Overlay darüber
     box.style.background = "#1a1a2a";
-    box.innerHTML = tileGrid("https://tile.openstreetmap.org/{z}/{x}/{y}.png", 7, "mapgrid") +
-      tileGrid(frame.url, 7, "radar-overlay") +
+    box.innerHTML = tileGrid("https://tile.openstreetmap.org/{z}/{x}/{y}.png", "mapgrid") +
+      tileGrid(frame.url, "radar-overlay") +
       "<div class='radar-pin'>📍</div>";
   }
 
@@ -754,8 +839,12 @@
         panelResults.innerHTML = "<div class='prow' style='color:var(--sub);cursor:default'>Suche nicht verfügbar (im Canvas blockiert – live gehostet funktioniert sie).</div>";
       });
   }
-  document.getElementById("panelGo").addEventListener("click", panelSearch);
-  panelInput.addEventListener("keydown", function (e) { if (e.key === "Enter") panelSearch(); });
+  var panelSearchTimer = null;
+  panelInput.addEventListener("input", function () {
+    clearTimeout(panelSearchTimer);
+    panelSearchTimer = setTimeout(panelSearch, 450);
+  });
+  panelInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { clearTimeout(panelSearchTimer); panelSearch(); } });
 
   document.getElementById("panelGps").addEventListener("click", function () {
     if (!navigator.geolocation) return;
