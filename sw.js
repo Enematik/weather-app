@@ -1,5 +1,5 @@
 // Service Worker: Offline-Cache für die Wetter-App
-var CACHE = "wetter-app-v1";
+var CACHE = "wetter-app-v2";
 var ASSETS = [
   "./",
   "./index.html",
@@ -8,12 +8,10 @@ var ASSETS = [
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png"
 ];
-
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ASSETS); }));
   self.skipWaiting();
 });
-
 self.addEventListener("activate", function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
     return Promise.all(keys.filter(function (k) { return k !== CACHE; })
@@ -21,12 +19,10 @@ self.addEventListener("activate", function (e) {
   }));
   self.clients.claim();
 });
-
 // Netzwerk zuerst (frische Wetterdaten), Fallback auf Cache wenn offline.
-// API-Antworten werden nie gecacht, nur die App-Dateien.
 self.addEventListener("fetch", function (e) {
   var url = new URL(e.request.url);
-  if (url.origin !== location.origin) return; // Wetter-/Radar-APIs direkt durchlassen
+  if (url.origin !== location.origin) return; // Wetter-/Radar-/Karten-APIs direkt durchlassen
   e.respondWith(
     fetch(e.request).then(function (res) {
       var copy = res.clone();
