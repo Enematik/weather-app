@@ -262,12 +262,17 @@
   <div class="rp-top"><h2>📡 Regenradar</h2><button class="rp-close" id="radarClose">✕ Schließen</button></div>
   <div class="rp-tabs">
     <button id="tabTiles" class="active">Karte + Radar</button>
-    <button id="tabWindy">Interaktiv (Windy)</button>
+    <button id="tabWindy">Windy</button>
+    <button id="tabWO">WetterOnline</button>
   </div>
   <div id="radarMount"></div>
   <div id="windyMount" style="display:none">
     <iframe class="windy-frame" id="windyFrame" title="Windy Regenradar"></iframe>
     <div class="rp-note">Interaktive Karte von Windy mit Regen-Overlay (für Deutschland u. a. DWD-Radardaten). Ohne Karte: Die Umgebung blockiert externe Inhalte.</div>
+  </div>
+  <div id="woMount" style="display:none">
+    <iframe class="windy-frame" id="woFrame" title="WetterOnline Regenradar"></iframe>
+    <div class="rp-note">Offizieller Regenradar von WetterOnline (interaktive Karte mit Regenvorhersage). Ohne Karte: Die Umgebung blockiert externe Inhalte – live gehostet erscheint die Karte.</div>
   </div>
 </div>
 
@@ -642,24 +647,33 @@
   }
   function closeRadar() { stopPlay(); radarPage.classList.remove("open"); }
   document.getElementById("radarClose").addEventListener("click", closeRadar);
-  document.getElementById("tabTiles").addEventListener("click", function () {
-    document.getElementById("tabTiles").classList.add("active");
-    document.getElementById("tabWindy").classList.remove("active");
-    document.getElementById("radarMount").style.display = "";
-    document.getElementById("windyMount").style.display = "none";
-  });
-  document.getElementById("tabWindy").addEventListener("click", function () {
-    document.getElementById("tabWindy").classList.add("active");
-    document.getElementById("tabTiles").classList.remove("active");
-    document.getElementById("radarMount").style.display = "none";
-    var wm = document.getElementById("windyMount");
-    wm.style.display = "";
-    var wf = document.getElementById("windyFrame");
-    if (!wf.src) {
-      wf.src = "https://embed.windy.com/?lat=" + state.lat.toFixed(2) + "&lon=" + state.lon.toFixed(2) +
-        "&zoom=7&level=surface&overlay=rain&menu=&message=false&marker=&calendar=now&pressure=&type=swell2&location=coordinates&detail=" +
-        state.lat.toFixed(4) + "," + state.lon.toFixed(4);
-    }
+  // Tab-Umschaltung in der Radar-Seite
+  var tabDefs = [
+    { btn: "tabTiles", mounts: ["radarMount"], onShow: null },
+    { btn: "tabWindy", mounts: ["windyMount"], onShow: function () {
+        var wf = document.getElementById("windyFrame");
+        if (!wf.src) {
+          wf.src = "https://embed.windy.com/?lat=" + state.lat.toFixed(2) + "&lon=" + state.lon.toFixed(2) +
+            "&zoom=7&level=surface&overlay=rain&menu=&message=false&marker=&calendar=now&pressure=&type=swell2&location=coordinates&detail=" +
+            state.lat.toFixed(4) + "," + state.lon.toFixed(4);
+        }
+      } },
+    { btn: "tabWO", mounts: ["woMount"], onShow: function () {
+        var wf = document.getElementById("woFrame");
+        if (!wf.src) wf.src = "https://www.wetteronline.de/regenradar?mode=interactive";
+      } }
+  ];
+  function switchTab(def) {
+    ["radarMount","windyMount","woMount"].forEach(function (m) {
+      document.getElementById(m).style.display = def.mounts.indexOf(m) >= 0 ? "" : "none";
+    });
+    tabDefs.forEach(function (d) {
+      document.getElementById(d.btn).classList.toggle("active", d === def);
+    });
+    if (def.onShow) def.onShow();
+  }
+  tabDefs.forEach(function (def) {
+    document.getElementById(def.btn).addEventListener("click", function () { switchTab(def); });
   });
 
   function drawRadarFrame() {

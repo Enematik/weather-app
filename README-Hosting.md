@@ -14,8 +14,10 @@ Safari öffnen → Teilen → „Zum Home-Bildschirm" → App startet mit eigene
 - Startet immer mit dem **aktuellen Standort** (GPS; ohne Erlaubnis Fallback Bonn)
 - Ortssuche-Panel von rechts mit automatischen Favoriten (bis 8, gespeichert)
 - Tages-Details in der 10-Tage-Vorhersage (Regen, Wind, UV, Sonne, Stundenverlauf)
-- Radar-Seite von rechts: „Karte + Radar" (OSM + RainViewer, Standard ≈ 50 km Umkreis,
-  zoombar) und „Interaktiv (Windy)" mit DWD-Radardaten für Deutschland
+- Radar-Seite von rechts mit drei Ansichten:
+  - *Karte + Radar*: OSM-Karte mit RainViewer-Radar (Standard ≈ 50 km Umkreis, zoombar)
+  - *Windy*: interaktive Karte mit Regen-Overlay (u. a. DWD-Daten)
+  - *WetterOnline*: offizieller Regenradar von WetterOnline als eingebettete Karte
 - Hintergrund passt sich Tageszeit und Wetter an (animierter Regen/Schnee)
 
 In der Canvas-Vorschau sind Netzwerkaufrufe blockiert (Demodaten); live gehostet funktioniert alles.
