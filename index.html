@@ -100,21 +100,6 @@
   .bars { display: flex; align-items: flex-end; gap: 2px; height: 40px; padding: 0 16px; margin-top: 8px; }
   .bar { flex: 1; background: linear-gradient(180deg, var(--accent2), var(--accent)); border-radius: 3px 3px 0 0; min-height: 2px; }
 
-  /* Radar: Karte als Basis, Radar-Overlay darüber */
-  .radar-box { position: relative; margin: 0 12px; border-radius: 14px; overflow: hidden;
-    border: 1px solid var(--border); aspect-ratio: 4/3; background:#000; }
-  .radar-box canvas, .radar-box .tilegrid { width: 100%; height: 100%; display: block; position: absolute; inset: 0; }
-  .tilegrid { display: grid; }
-  .tilegrid img { width: 100%; height: 100%; display: block; }
-  .radar-overlay { opacity: .78; mix-blend-mode: screen; }
-  .radar-pin { position:absolute; left:50%; top:50%; transform:translate(-50%,-100%); font-size:26px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); z-index: 5; }
-  .radar-time { text-align:center; font-size:12.5px; color: var(--sub); padding: 10px 0 4px; }
-  .radar-ctrl { display:flex; gap:8px; padding: 6px 16px 8px; }
-  .radar-ctrl button { flex:1; padding:8px 0; border-radius:10px; border:1px solid var(--border);
-    background: var(--card); color: var(--text); font-size:13px; font-weight:600; cursor:pointer; }
-  .radar-ctrl button.active { background: linear-gradient(135deg, var(--accent) 0%, #b3001b 100%); border-color:transparent; }
-  .radar-legend { display:flex; gap:4px; justify-content:center; padding: 2px 16px 8px; }
-  .radar-legend span { width:22px; height:8px; border-radius:2px; display:inline-block; }
 
   /* 10-day */
   .day-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; }
@@ -189,21 +174,6 @@
   .rp-tabs button { flex: 1; padding: 10px 0; border-radius: 12px; border: 1px solid var(--border);
     background: var(--card); color: var(--text); font-weight: 600; font-size: 13.5px; cursor: pointer; }
   .rp-tabs button.active { background: linear-gradient(135deg, var(--accent) 0%, #b3001b 100%); border-color: transparent; }
-  .radar-box.rp { aspect-ratio: 3/4; margin: 0; }
-  .radar-zoom { display: flex; gap: 8px; padding: 8px 16px 4px; }
-  .radar-zoom button { flex: 1; padding: 8px 0; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; }
-  .windy-frame { width: 100%; aspect-ratio: 3/4; border: 1px solid var(--border); border-radius: 14px; background: #000; }
-  .rp-note { font-size: 12px; color: var(--sub); text-align: center; padding: 8px; line-height: 1.5; }
-  .panel h2 { font-size: 20px; font-weight: 600; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-  .panel h2 button { background: var(--card); border: 1px solid var(--border); color: var(--text);
-    border-radius: 16px; padding: 5px 11px; font-size: 14px; cursor: pointer; }
-  .panel .search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
-  .panel input {
-    flex: 1; padding: 12px 14px; border-radius: 14px;
-    background: var(--card); border: 1px solid var(--border); color: var(--text);
-    font-size: 15px; outline: none;
-  }
   .panel input::placeholder { color: var(--sub); }
   .panel .go {
     padding: 12px 14px; border-radius: 14px; border: none; cursor: pointer;
@@ -234,7 +204,7 @@
   <div class="header" id="header"></div>
   <div class="status" id="status">Wetterdaten werden geladen …</div>
   <div id="content"></div>
-  <footer>Daten: Open-Meteo.com · Radar: RainViewer · Karte: OpenStreetMap</footer>
+  <footer>Daten: Open-Meteo.com · Radar: kachelmannwetter.com</footer>
 </div>
 
 <!-- Slide-in Ortssuche -->
@@ -260,19 +230,10 @@
 <!-- Radar-Großansicht -->
 <div class="radar-page" id="radarPage">
   <div class="rp-top"><h2>📡 Regenradar</h2><button class="rp-close" id="radarClose">✕ Schließen</button></div>
-  <div class="rp-tabs">
-    <button id="tabTiles" class="active">Karte + Radar</button>
-    <button id="tabWindy">Windy</button>
-    <button id="tabWO">WetterOnline</button>
-  </div>
-  <div id="radarMount"></div>
-  <div id="windyMount" style="display:none">
-    <iframe class="windy-frame" id="windyFrame" title="Windy Regenradar"></iframe>
-    <div class="rp-note">Interaktive Karte von Windy mit Regen-Overlay (für Deutschland u. a. DWD-Radardaten). Ohne Karte: Die Umgebung blockiert externe Inhalte.</div>
-  </div>
-  <div id="woMount" style="display:none">
-    <iframe class="windy-frame" id="woFrame" title="WetterOnline Regenradar"></iframe>
-    <div class="rp-note">Offizieller Regenradar von WetterOnline (interaktive Karte mit Regenvorhersage). Ohne Karte: Die Umgebung blockiert externe Inhalte – live gehostet erscheint die Karte.</div>
+  <div id="radarMount">
+    <iframe class="windy-frame" id="kmFrame" title="Kachelmannwetter Regenradar"></iframe>
+    <div class="rp-note" id="kmRegion"></div>
+    <div class="rp-note">Regenradar HD+ von kachelmannwetter.com – automatisch passend zur Region deines Ortes, mit Animation über die letzten Stunden. Ohne Karte: Die Umgebung blockiert externe Inhalte.</div>
   </div>
 </div>
 
@@ -416,7 +377,7 @@
   }
 
   // ---------- State ----------
-  var state = { view: "std", data: null, place: "", lat: 50.73, lon: 7.10, radarLive: false };
+  var state = { view: "std", data: null, place: "", lat: 50.73, lon: 7.10 };
   var statusEl = document.getElementById("status");
   var headerEl = document.getElementById("header");
   var contentEl = document.getElementById("content");
@@ -570,200 +531,51 @@
     document.getElementById("mClose").addEventListener("click", closeDay);
   }
 
-  // ---------- Regenradar: eigene Seite (RainViewer-Kacheln + Windy) ----------
-  var radarState = { frames: [], idx: 0, playing: null, z: 9 };  // Zoom 9 ≈ 50 km Umkreis
+  // ---------- Regenradar: Kachelmannwetter, Regionsansicht ----------
   var radarPage = document.getElementById("radarPage");
+  var kmFrame = document.getElementById("kmFrame");
+  var kmRegionLabel = document.getElementById("kmRegion");
 
-  function tileGrid(url, cls) {
-    var z = radarState.z, n = Math.pow(2, z);
-    var xTile = Math.floor((state.lon + 180) / 360 * n);
-    var latR = state.lat * Math.PI / 180;
-    var yTile = Math.floor((1 - Math.log(Math.tan(latR) + 1/Math.cos(latR)) / Math.PI) / 2 * n);
-    var html = "<div class='tilegrid " + cls + "' style='grid-template-columns:repeat(3,33.333%);grid-template-rows:repeat(3,33.333%);transform:scale(1.4)'>";
-    for (var dy=-1; dy<=1; dy++) for (var dx=-1; dx<=1; dx++) {
-      var xx = (xTile+dx+n)%n, yy = Math.min(n-1, Math.max(0, yTile+dy));
-      html += "<img src='" + url.replace("{z}",z).replace("{x}",xx).replace("{y}",yy) + "' alt=''>";
-    }
-    return html + "</div>";
-  }
-
-  function renderRadar() {
-    var mount = document.getElementById("radarMount");
-    mount.innerHTML = "<div class='radar-box rp' id='radarBox'></div>" +
-      "<div class='radar-time' id='radarTime'>Radar wird geladen …</div>" +
-      "<div class='radar-ctrl'>" +
-        "<button id='rPlay'>▶️ Animation</button>" +
-        "<button id='rPrev'>◀ 30 Min</button>" +
-        "<button id='rNext'>30 Min ▶</button>" +
-        "<button id='rNow'>Jetzt</button>" +
-      "</div>" +
-      "<div class='radar-zoom'>" +
-        "<button id='zOut'>➖ Herauszoomen</button>" +
-        "<button id='zIn'>➕ Hineinzoomen</button>" +
-      "</div>" +
-      "<div class='radar-legend'>" +
-        "<span style='background:#7ef77e'></span><span style='background:#2ec92e'></span>" +
-        "<span style='background:#1c9bd1'></span><span style='background:#1a3fd6'></span>" +
-        "<span style='background:#9b2ec9'></span><span style='background:#e33b16'></span>" +
-        "<span style='background:#ffd12e'></span>" +
-      "</div>" +
-      "<div class='rp-note'>Basis: OpenStreetMap · Radar: RainViewer</div>";
-
-    fetch("https://api.rainviewer.com/public/weather-maps.json")
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        radarState.frames = (j.radar && j.radar.past ? j.radar.past : []).map(function (f) {
-          return { time: f.time * 1000, url: j.host + f.path + "/256/{z}/{x}/{y}/2/1_1.png" };
-        });
-        if (!radarState.frames.length) throw new Error("no frames");
-        radarState.frames.push({ time: Date.now(), url: null, forecast: false });
-        state.radarLive = true;
-        radarState.idx = Math.max(0, radarState.frames.length - 2);
-        drawRadarFrame();
-      })
-      .catch(function () { drawRadarDemo(); });
-
-    document.getElementById("rPlay").addEventListener("click", togglePlay);
-    document.getElementById("rPrev").addEventListener("click", function () { stopPlay(); radarState.idx = Math.max(0, radarState.idx - 1); drawRadarFrame(); });
-    document.getElementById("rNext").addEventListener("click", function () { stopPlay(); radarState.idx = Math.min(radarState.frames.length - 1, radarState.idx + 1); drawRadarFrame(); });
-    document.getElementById("rNow").addEventListener("click", function () { stopPlay(); radarState.idx = Math.max(0, radarState.frames.length - 2); drawRadarFrame(); });
-    document.getElementById("zIn").addEventListener("click", function () {
-      radarState.z = Math.min(11, radarState.z + 1); redrawRadar();
-    });
-    document.getElementById("zOut").addEventListener("click", function () {
-      radarState.z = Math.max(7, radarState.z - 1); redrawRadar();
-    });
-  }
-
-  function redrawRadar() {
-    if (state.radarLive && radarState.frames.length) drawRadarFrame();
-    else drawRadarDemo();
-  }
-
-  // Radar-Seite öffnen/schließen
-  function openRadar() {
-    radarPage.classList.add("open");
-    renderRadar();
-  }
-  function closeRadar() { stopPlay(); radarPage.classList.remove("open"); }
-  document.getElementById("radarClose").addEventListener("click", closeRadar);
-  // Tab-Umschaltung in der Radar-Seite
-  var tabDefs = [
-    { btn: "tabTiles", mounts: ["radarMount"], onShow: null },
-    { btn: "tabWindy", mounts: ["windyMount"], onShow: function () {
-        var wf = document.getElementById("windyFrame");
-        if (!wf.src) {
-          wf.src = "https://embed.windy.com/?lat=" + state.lat.toFixed(2) + "&lon=" + state.lon.toFixed(2) +
-            "&zoom=7&level=surface&overlay=rain&menu=&message=false&marker=&calendar=now&pressure=&type=swell2&location=coordinates&detail=" +
-            state.lat.toFixed(4) + "," + state.lon.toFixed(4);
-        }
-      } },
-    { btn: "tabWO", mounts: ["woMount"], onShow: function () {
-        var wf = document.getElementById("woFrame");
-        if (!wf.src) wf.src = "https://www.wetteronline.de/regenradar?mode=interactive";
-      } }
+  // Regionen von kachelmannwetter.com (slug, Name, latMin, latMax, lonMin, lonMax)
+  var KM_REGIONS = [
+    ["berlin", "Berlin", 52.3, 52.75, 13.05, 13.8],
+    ["hamburg", "Hamburg", 53.3, 53.95, 9.6, 10.4],
+    ["bremen", "Bremen", 53.0, 53.65, 8.4, 9.0],
+    ["saarland", "Saarland", 49.1, 49.65, 6.3, 7.2],
+    ["schleswig-holstein", "Schleswig-Holstein", 53.35, 55.15, 8.0, 11.5],
+    ["mecklenburg-vorpommern", "Mecklenburg-Vorpommern", 53.0, 54.75, 10.5, 14.6],
+    ["niedersachsen", "Niedersachsen", 51.3, 53.95, 6.4, 11.7],
+    ["nordrhein-westfalen", "Nordrhein-Westfalen", 50.3, 52.6, 5.8, 9.6],
+    ["hessen", "Hessen", 49.3, 51.7, 7.7, 10.3],
+    ["rheinland-pfalz", "Rheinland-Pfalz", 48.9, 51.0, 6.0, 8.6],
+    ["baden-wuerttemberg", "Baden-Württemberg", 47.5, 49.9, 7.4, 10.6],
+    ["bayern", "Bayern", 47.2, 50.7, 8.9, 14.0],
+    ["sachsen-anhalt", "Sachsen-Anhalt", 50.9, 53.1, 10.5, 13.3],
+    ["brandenburg", "Brandenburg", 51.2, 53.7, 11.2, 14.95],
+    ["sachsen", "Sachsen", 50.1, 51.7, 11.7, 15.1],
+    ["thueringen", "Thüringen", 50.2, 51.7, 9.8, 12.2]
   ];
-  function switchTab(def) {
-    ["radarMount","windyMount","woMount"].forEach(function (m) {
-      document.getElementById(m).style.display = def.mounts.indexOf(m) >= 0 ? "" : "none";
-    });
-    tabDefs.forEach(function (d) {
-      document.getElementById(d.btn).classList.toggle("active", d === def);
-    });
-    if (def.onShow) def.onShow();
-  }
-  tabDefs.forEach(function (def) {
-    document.getElementById(def.btn).addEventListener("click", function () { switchTab(def); });
-  });
-
-  function drawRadarFrame() {
-    var box = document.getElementById("radarBox");
-    var timeEl = document.getElementById("radarTime");
-    var frame = radarState.frames[radarState.idx];
-    if (!frame || !box) return;
-    if (!frame.url) {
-      drawRadarDemo();
-      var te = document.getElementById("radarTime");
-      if (te) te.textContent = "Nächste 30 Min (Prognose)";
-      return;
+  function kmRegionFor(lat, lon) {
+    for (var i = 0; i < KM_REGIONS.length; i++) {
+      var r = KM_REGIONS[i];
+      if (lat >= r[2] && lat <= r[3] && lon >= r[4] && lon <= r[5]) return r;
     }
-    timeEl.textContent = "Radar " + (new Date(frame.time)).toLocaleString("de-DE", {hour:"2-digit", minute:"2-digit"}) + " Uhr";
-    // OpenStreetMap-Karte als Basis + halbtransparentes Radar-Overlay darüber
-    box.style.background = "#1a1a2a";
-    box.innerHTML = tileGrid("https://tile.openstreetmap.org/{z}/{x}/{y}.png", "mapgrid") +
-      tileGrid(frame.url, "radar-overlay") +
-      "<div class='radar-pin'>📍</div>";
+    return null; // außerhalb Deutschlands -> Deutschland-Ansicht
   }
-
-  function togglePlay() {
-    if (radarState.playing) { stopPlay(); return; }
-    var btn = document.getElementById("rPlay");
-    btn.textContent = "⏸️ Stopp";
-    radarState.playing = setInterval(function () {
-      radarState.idx = (radarState.idx + 1) % radarState.frames.length;
-      drawRadarFrame();
-    }, 900);
-  }
-  function stopPlay() {
-    if (radarState.playing) { clearInterval(radarState.playing); radarState.playing = null; }
-    var btn = document.getElementById("rPlay");
-    if (btn) btn.textContent = "▶️ Animation";
-  }
-
-  // Demo-Radar: stilisierte Karte mit Straßen + animierte Regenwolken (zoombar)
-  var demoTimer = null;
-  function drawRadarDemo() {
-    var box = document.getElementById("radarBox");
-    if (!box) return;
-    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-    box.style.background = "#e8e4da";
-    box.innerHTML = "<canvas id='radarCv'></canvas><div class='radar-pin'>📍</div>";
-    var cv = document.getElementById("radarCv");
-    cv.width = 512; cv.height = 384;
-    var ctx = cv.getContext("2d");
-    var s = Math.pow(2, radarState.z - 9); // Zoom für die Demo-Ansicht
-    var cols = ["#7ef77e","#2ec92e","#1c9bd1","#1a3fd6","#9b2ec9","#e33b16"];
-    var blobs = [];
-    for (var i=0;i<6;i++) {
-      blobs.push({ x: 60+Math.random()*392, y: 40+Math.random()*300, r: (22+Math.random()*40)*s,
-        c: cols[Math.floor(Math.random()*4)], a: .25+Math.random()*.3, vx: (Math.random()-.5)*.6, vy: .2+Math.random()*.3 });
+  function openRadar() {
+    var r = kmRegionFor(state.lat, state.lon);
+    var slug = r ? r[0] : "deutschland";
+    var name = r ? r[1] : "Deutschland";
+    kmRegionLabel.textContent = "Region: " + name;
+    var url = "https://kachelmannwetter.com/de/regenradar/" + slug;
+    if (!kmFrame.src || kmFrame.dataset.slug !== slug) {
+      kmFrame.src = url;
+      kmFrame.dataset.slug = slug;
     }
-    function frame() {
-      if (!document.getElementById("radarCv")) { clearInterval(demoTimer); demoTimer = null; return; }
-      // Kartenuntergrund
-      ctx.fillStyle = "#e8e4da"; ctx.fillRect(0,0,512,384);
-      ctx.fillStyle = "#d5d0c4";
-      var sp = 40 * s;
-      for (var bx=-sp; bx<512; bx+=sp) for (var by=-sp; by<384; by+=sp) {
-        ctx.fillRect(bx + ((by/sp)%2)*(sp/2), by, sp*.6, sp*.45);
-      }
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = 5;
-      for (var i=0;i<5;i++) { ctx.beginPath(); ctx.moveTo(0, 50+i*72*s); ctx.lineTo(512, 90+i*60*s); ctx.stroke(); }
-      for (var i=0;i<4;i++) { ctx.beginPath(); ctx.moveTo(60+i*130*s, 0); ctx.lineTo(120+i*120*s, 384); ctx.stroke(); }
-      ctx.strokeStyle = "#ffd9d9"; ctx.lineWidth = 10;
-      ctx.beginPath(); ctx.moveTo(0,300); ctx.bezierCurveTo(170,280,340,330,512,290); ctx.stroke();
-      // Ort
-      ctx.fillStyle = "#c23a3a"; ctx.beginPath(); ctx.arc(256,192,7*s,0,7); ctx.fill();
-      // Regenwolken (animiert)
-      blobs.forEach(function (b) {
-        b.x += b.vx; b.y += b.vy;
-        if (b.x < -40) b.x = 550; if (b.x > 560) b.x = -40;
-        if (b.y > 420) { b.y = -40; }
-        var g = ctx.createRadialGradient(b.x,b.y,2,b.x,b.y,b.r);
-        g.addColorStop(0, b.c); g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.globalAlpha = b.a; ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,7); ctx.fill();
-      });
-      ctx.globalAlpha = 1;
-    }
-    demoTimer = setInterval(frame, 120);
-    frame();
-    var te = document.getElementById("radarTime");
-    if (te) {
-      var km = round(30 / s * 1.6);
-      te.textContent = state.radarLive ? "" : ("Demo-Karte · Zoomstufe " + radarState.z + " (≈ " + km + " km Umkreis) – live mit echter OSM-Karte, sobald gehostet");
-    }
+    radarPage.classList.add("open");
   }
+  function closeRadar() { radarPage.classList.remove("open"); }
+  document.getElementById("radarClose").addEventListener("click", closeRadar);
 
   // ---------- Slide-in Ortssuche + Favoriten ----------
   var panel = document.getElementById("panel");
