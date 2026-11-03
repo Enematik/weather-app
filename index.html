@@ -207,7 +207,7 @@
   <div class="header" id="header"></div>
   <div class="status" id="status">Wetterdaten werden geladen …</div>
   <div id="content"></div>
-  <footer>Daten: Open-Meteo.com · Radar: DWD via BrightSky</footer>
+  <footer>Daten: Open-Meteo.com · Radar: RainViewer</footer>
 </div>
 
 <!-- Slide-in Ortssuche -->
@@ -530,75 +530,89 @@
     document.getElementById("mClose").addEventListener("click", closeDay);
   }
 
-  // ---------- Regenradar: DWD-Radarnowcast via BrightSky ----------
+  // ---------- Regenradar: RainViewer (Kacheln, Rückblick + Nowcast) ----------
   var radarPage = document.getElementById("radarPage");
-  var rbs = { frames: [], w: 101, h: 101, pos: null, idx: 0, timer: null, live: false, demoTimer: null };
+  var rbs = { frames: [], host: "", idx: 0, timer: null, demoTimer: null, zoom: 10, cache: {} };
 
-  async function inflateB64(b64) {
-    var bin = atob(b64);
-    var bytes = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    var ds = new DecompressionStream("deflate");
-    var buf = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
-    return new Uint16Array(buf);
+  // Web-Mercator: Kachel-Koordinaten für Breite/Länge
+  function tileXY(lat, lon, z) {
+    var latR = lat * Math.PI / 180;
+    var x = (lon + 180) / 360 * Math.pow(2, z);
+    var y = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * Math.pow(2, z);
+    return { x: x, y: y };
   }
 
-  // Farbskala: Wert in 0,01 mm pro 5 Minuten
-  function rainColor(v) {
-    if (!v || v >= 4096) return [0, 0, 0, 0]; // 0 = trocken, >= 4096 = keine Daten
-    if (v < 10)  return [126, 247, 126, 150];
-    if (v < 25)  return [46, 201, 46, 175];
-    if (v < 50)  return [28, 155, 209, 195];
-    if (v < 100) return [26, 63, 214, 215];
-    if (v < 200) return [155, 46, 201, 230];
-    if (v < 400) return [227, 59, 22, 240];
-    return [255, 209, 46, 248];
+  function loadTile(url) {
+    if (rbs.cache[url] !== undefined) return rbs.cache[url];
+    rbs.cache[url] = new Promise(function (res, rej) {
+      var im = new Image();
+      im.onload = function () { res(im); };
+      im.onerror = function () { delete rbs.cache[url]; rej(new Error("tile")); };
+      im.src = url;
+    });
+    return rbs.cache[url];
+  }
+
+  // Kachel-Ebene zeichnen (Karte oder Radar), zentriert auf lat/lon
+  function drawLayer(ctx, tmpl, z, lat, lon, w, h, op) {
+    var n = Math.pow(2, z);
+    var c = tileXY(lat, lon, z);
+    var ox = w / 2 - c.x * 256, oy = h / 2 - c.y * 256;
+    var x0 = Math.floor(-ox / 256), x1 = Math.floor((w - ox) / 256);
+    var y0 = Math.floor(-oy / 256), y1 = Math.floor((h - oy) / 256);
+    var jobs = [];
+    for (var ty = y0; ty <= y1; ty++) {
+      for (var tx = x0; tx <= x1; tx++) {
+        var sx = ((tx % n) + n) % n, sy = ((ty % n) + n) % n;
+        var url = tmpl.replace("{z}", z).replace("{x}", sx).replace("{y}", sy);
+        jobs.push(loadTile(url).then(function (px, py) {
+          return function (img) { ctx.drawImage(img, px, py, 256, 256); };
+        }(tx * 256 + ox, ty * 256 + oy)).catch(function () {}));
+      }
+    }
+    ctx.globalAlpha = op;
+    var all = Promise.all(jobs);
+    all.then(function () { ctx.globalAlpha = 1; });
+    return all;
+  }
+
+  function frameUrl(i) {
+    return rbs.host + rbs.frames[i].path + "/256/{z}/{x}/{y}/4/1_1.png";
   }
 
   function renderRadar() {
     var mount = document.getElementById("radarMount");
-    mount.innerHTML = "<div class='radar-box' id='radarBox'><canvas id='radarCv'></canvas><div class='radar-pin'>📍</div></div>" +
+    mount.innerHTML = "<div class='radar-box' id='radarBox'><canvas id='radarCv'></canvas><div class='radar-pin' style='left:50%;top:50%'>📍</div></div>" +
       "<div class='radar-time' id='radarTime'>Radar wird geladen …</div>" +
       "<div class='radar-ctrl'>" +
         "<button id='rPlay'>▶️ Abspielen</button>" +
-        "<button id='rPrev'>◀ 5 Min</button>" +
-        "<button id='rNext'>5 Min ▶</button>" +
+        "<button id='rPrev'>◀ Frame</button>" +
+        "<button id='rNext'>Frame ▶</button>" +
         "<button id='rNow'>Jetzt</button>" +
       "</div>" +
+      "<input type='range' id='rSlide' min='0' max='0' value='0' style='width:100%;accent-color:#e02020;margin:12px 0'>" +
       "<div class='radar-legend'>" +
-        "<span style='background:#7ef77e'></span><span style='background:#2ec92e'></span>" +
-        "<span style='background:#1c9bd1'></span><span style='background:#1a3fd6'></span>" +
+        "<span style='background:#a8f0a8'></span><span style='background:#31c831'></span>" +
+        "<span style='background:#26d2d2'></span><span style='background:#1f6edb'></span>" +
         "<span style='background:#9b2ec9'></span><span style='background:#e33b16'></span>" +
         "<span style='background:#ffd12e'></span>" +
       "</div>" +
-      "<div class='rp-note'>Niederschlagsradar des DWD (RADOLAN, via BrightSky) · Umkreis ≈ 50 km um deinen Ort · 5-Minuten-Schritte: letzte Stunden im Rückblick, dazu 2 Stunden Vorhersage</div>";
+      "<div class='rp-note'>Regenradar von RainViewer · Hintergrundkarte © OpenStreetMap-Mitwirkende, © CARTO · Rückblick der letzten 2 Stunden in 10-Minuten-Schritten plus 30 Minuten Vorhersage · zentriert auf deinen Ort (ca. 50 km Umkreis)</div>";
     document.getElementById("rPlay").addEventListener("click", toggleRadarPlay);
-    document.getElementById("rPrev").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.max(0, rbs.idx - 1); drawRadarFrame(); });
-    document.getElementById("rNext").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.min(rbs.frames.length - 1, rbs.idx + 1); drawRadarFrame(); });
-    document.getElementById("rNow").addEventListener("click", function () { stopRadarPlay(); jumpToNow(); drawRadarFrame(); });
+    document.getElementById("rPrev").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.max(0, rbs.idx - 1); showRadarFrame(); });
+    document.getElementById("rNext").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.min(rbs.frames.length - 1, rbs.idx + 1); showRadarFrame(); });
+    document.getElementById("rNow").addEventListener("click", function () { stopRadarPlay(); jumpToNow(); showRadarFrame(); });
+    document.getElementById("rSlide").addEventListener("input", function (e) { stopRadarPlay(); rbs.idx = +e.target.value; showRadarFrame(); });
 
-    var url = "https://api.brightsky.dev/radar?lat=" + state.lat.toFixed(4) +
-      "&lon=" + state.lon.toFixed(4) + "&distance=50000&tz=Europe/Berlin";
-    fetch(url)
+    fetch("https://api.rainviewer.com/public/weather-maps.json")
       .then(function (r) { return r.json(); })
       .then(function (j) {
-        if (!j.radar || !j.radar.length) throw new Error("no frames");
-        var top = j.bbox[0], left = j.bbox[1], bottom = j.bbox[2], right = j.bbox[3];
-        rbs.w = right - left + 1;
-        rbs.h = bottom - top + 1;
-        rbs.pos = j.latlon_position || { x: rbs.w / 2, y: rbs.h / 2 };
-        var jobs = j.radar.map(function (rec) {
-          return inflateB64(rec.precipitation_5).then(function (vals) {
-            return { ts: new Date(rec.timestamp).getTime(), vals: vals };
-          });
-        });
-        return Promise.all(jobs);
-      })
-      .then(function (frames) {
-        rbs.frames = frames;
-        rbs.live = true;
+        if (!j || !j.radar || !j.radar.past || !j.radar.past.length) throw new Error("no frames");
+        rbs.host = j.host;
+        rbs.frames = j.radar.past.concat(j.radar.nowcast || []);
+        document.getElementById("rSlide").max = rbs.frames.length - 1;
         jumpToNow();
-        drawRadarFrame();
+        showRadarFrame();
       })
       .catch(function () { radarDemo(); });
   }
@@ -606,50 +620,45 @@
   function jumpToNow() {
     var now = Date.now();
     rbs.idx = 0;
-    for (var i = 0; i < rbs.frames.length; i++) if (rbs.frames[i].ts <= now) rbs.idx = i;
+    for (var i = 0; i < rbs.frames.length; i++) if (rbs.frames[i].time * 1000 <= now) rbs.idx = i;
   }
 
-  function drawRadarFrame() {
+  function showRadarFrame() {
     var box = document.getElementById("radarBox");
     if (!box) return;
     var cv = document.getElementById("radarCv");
     var ctx = cv.getContext("2d");
-    var w = rbs.w, h = rbs.h;
-    cv.width = w; cv.height = h;
+    var size = 520;
+    cv.width = size; cv.height = size;
+    var lat = state.lat, lon = state.lon, z = rbs.zoom;
+    ctx.fillStyle = "#0b0c12";
+    ctx.fillRect(0, 0, size, size);
     var f = rbs.frames[rbs.idx];
-    if (f) {
-      var img = ctx.createImageData(w, h);
-      for (var i = 0; i < w * h; i++) {
-        var c = rainColor(f.vals[i] || 0);
-        img.data[i*4] = c[0]; img.data[i*4+1] = c[1]; img.data[i*4+2] = c[2]; img.data[i*4+3] = c[3];
-      }
-      ctx.putImageData(img, 0, 0);
-    } else {
-      ctx.clearRect(0, 0, w, h);
-    }
-    var pin = box.querySelector(".radar-pin");
-    if (pin && rbs.pos) {
-      pin.style.left = (100 * rbs.pos.x / w) + "%";
-      pin.style.top = (100 * rbs.pos.y / h) + "%";
-    }
+    var base = drawLayer(ctx, "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", z, lat, lon, size, size, 1);
+    if (f) base.then(function () {
+      return drawLayer(ctx, frameUrl(rbs.idx), z, lat, lon, size, size, 0.8);
+    }).catch(function () {});
+    var sl = document.getElementById("rSlide");
+    if (sl) sl.value = rbs.idx;
     var timeEl = document.getElementById("radarTime");
     if (timeEl && f) {
-      var d = new Date(f.ts);
-      var lbl = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr";
-      var mins = Math.round((f.ts - Date.now()) / 60000);
-      if (mins > 5) timeEl.textContent = "Vorhersage für " + lbl + " (+" + mins + " Min)";
-      else if (mins < -5) timeEl.textContent = "Rückblick: " + lbl;
-      else timeEl.textContent = "Jetzt: " + lbl;
+      var t = f.time * 1000;
+      var lbl = new Date(t).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr";
+      var mins = Math.round((t - Date.now()) / 60000);
+      if (mins > 5) timeEl.textContent = "Vorhersage · " + lbl + " (+" + mins + " Min)";
+      else if (mins < -5) timeEl.textContent = "Rückblick · " + lbl;
+      else timeEl.textContent = "Jetzt · " + lbl;
     }
   }
 
   function toggleRadarPlay() {
     if (rbs.timer) { stopRadarPlay(); return; }
+    if (!rbs.frames.length) return;
     document.getElementById("rPlay").textContent = "⏸️ Stopp";
     rbs.timer = setInterval(function () {
       rbs.idx = (rbs.idx + 1) % rbs.frames.length;
-      drawRadarFrame();
-    }, 400);
+      showRadarFrame();
+    }, 700);
   }
   function stopRadarPlay() {
     if (rbs.timer) { clearInterval(rbs.timer); rbs.timer = null; }
@@ -665,12 +674,12 @@
     var cv = document.getElementById("radarCv");
     cv.width = 256; cv.height = 256;
     var ctx = cv.getContext("2d");
-    var cols = ["#7ef77e","#2ec92e","#1c9bd1","#1a3fd6","#9b2ec9","#e33b16"];
+    var cols = ["#a8f0a8", "#31c831", "#26d2d2", "#1f6edb", "#9b2ec9", "#e33b16"];
     var blobs = [];
     for (var i = 0; i < 7; i++) {
-      blobs.push({ x: Math.random()*256, y: Math.random()*256, r: 12+Math.random()*30,
-        c: cols[Math.floor(Math.random()*5)], a: .3+Math.random()*.3,
-        vx: (Math.random()-.5)*.8, vy: .3+Math.random()*.5 });
+      blobs.push({ x: Math.random() * 256, y: Math.random() * 256, r: 12 + Math.random() * 30,
+        c: cols[Math.floor(Math.random() * 5)], a: .3 + Math.random() * .3,
+        vx: (Math.random() - .5) * .8, vy: .3 + Math.random() * .5 });
     }
     rbs.demoTimer = setInterval(function () {
       ctx.fillStyle = "#0e0f16"; ctx.fillRect(0, 0, 256, 256);
@@ -691,7 +700,7 @@
       ctx.globalAlpha = 1;
     }, 120);
     var te = document.getElementById("radarTime");
-    if (te) te.textContent = "Demo-Ansicht – live erscheint hier der DWD-Radar via BrightSky";
+    if (te) te.textContent = "Demo-Ansicht – live erscheint hier der Regenradar von RainViewer";
   }
 
   function openRadar() {

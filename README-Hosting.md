@@ -24,10 +24,11 @@ icons/ (App-Icons für iPhone/Home-Bildschirm).
 3. App-Icon erscheint auf dem Home-Bildschirm, startet im Vollbild
 
 ## Datenquellen
-- Vorhersage: Open-Meteo – kostenlos, ohne API-Key
-- Regenradar: DWD-RADOLAN via BrightSky (api.brightsky.dev) – kostenlos,
-  zentriert auf deinen Ort, ca. 50 km Umkreis, 5-Minuten-Schritte
-  (letzte Stunden Rückblick + 2 Stunden Vorhersage)
+- Wetter & 10-Tage-Vorhersage: Open-Meteo (api.open-meteo.com) – kostenlos, ohne API-Key
+- Regenradar: RainViewer (api.rainviewer.com) – kostenlos, weltweite Radardaten,
+  zentriert auf deinen Ort (ca. 50 km Umkreis), Rückblick der letzten 2 Stunden
+  in 10-Minuten-Schritten plus 30 Minuten Vorhersage
+- Hintergrundkarte: OpenStreetMap / CARTO (dunkler Stil)
 
 ## Hinweise
 - Beim ersten Start fragt iOS nach dem Standort – erlauben

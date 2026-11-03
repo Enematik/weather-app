@@ -1,7 +1,7 @@
 {
   "name": "Wetter App",
   "short_name": "Wetter",
-  "description": "Wetter, 10-Tage-Vorhersage und DWD-Regenradar",
+  "description": "Wetter, 10-Tage-Vorhersage und Regenradar",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0a0f",
