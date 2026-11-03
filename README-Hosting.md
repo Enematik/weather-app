@@ -26,8 +26,8 @@ icons/ (App-Icons für iPhone/Home-Bildschirm).
 ## Datenquellen
 - Wetter & 10-Tage-Vorhersage: Open-Meteo (api.open-meteo.com) – kostenlos, ohne API-Key
 - Regenradar: RainViewer (api.rainviewer.com) – kostenlos, weltweite Radardaten,
-  zentriert auf deinen Ort (ca. 50 km Umkreis), Rückblick der letzten 2 Stunden
-  in 10-Minuten-Schritten plus 30 Minuten Vorhersage
+  zentriert auf deinen Ort, Rückblick der letzten 2 Stunden in 10-Minuten-Schritten
+  plus 30 Minuten Vorhersage
 - Hintergrundkarte: OpenStreetMap / CARTO (dunkler Stil)
 
 ## Hinweise

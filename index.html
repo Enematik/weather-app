@@ -532,7 +532,7 @@
 
   // ---------- Regenradar: RainViewer (Kacheln, Rückblick + Nowcast) ----------
   var radarPage = document.getElementById("radarPage");
-  var rbs = { frames: [], host: "", idx: 0, timer: null, demoTimer: null, zoom: 10, cache: {} };
+  var rbs = { frames: [], host: "", idx: 0, timer: null, demoTimer: null, zoom: 8, nativeRadar: 7, cache: {} };
 
   // Web-Mercator: Kachel-Koordinaten für Breite/Länge
   function tileXY(lat, lon, z) {
@@ -554,20 +554,23 @@
   }
 
   // Kachel-Ebene zeichnen (Karte oder Radar), zentriert auf lat/lon
-  function drawLayer(ctx, tmpl, z, lat, lon, w, h, op) {
-    var n = Math.pow(2, z);
+  // nz = maximale native Zoomstufe der Quelle (Kacheln werden ggf. hochskaliert)
+  function drawLayer(ctx, tmpl, z, nz, lat, lon, w, h, op) {
+    var sc = Math.pow(2, z - nz); // Skalierung pro Kachel
+    var n = Math.pow(2, nz);
     var c = tileXY(lat, lon, z);
     var ox = w / 2 - c.x * 256, oy = h / 2 - c.y * 256;
-    var x0 = Math.floor(-ox / 256), x1 = Math.floor((w - ox) / 256);
-    var y0 = Math.floor(-oy / 256), y1 = Math.floor((h - oy) / 256);
+    var ts = 256 * sc;
+    var x0 = Math.floor(-ox / ts), x1 = Math.floor((w - ox) / ts);
+    var y0 = Math.floor(-oy / ts), y1 = Math.floor((h - oy) / ts);
     var jobs = [];
     for (var ty = y0; ty <= y1; ty++) {
       for (var tx = x0; tx <= x1; tx++) {
         var sx = ((tx % n) + n) % n, sy = ((ty % n) + n) % n;
-        var url = tmpl.replace("{z}", z).replace("{x}", sx).replace("{y}", sy);
+        var url = tmpl.replace("{z}", nz).replace("{x}", sx).replace("{y}", sy);
         jobs.push(loadTile(url).then(function (px, py) {
-          return function (img) { ctx.drawImage(img, px, py, 256, 256); };
-        }(tx * 256 + ox, ty * 256 + oy)).catch(function () {}));
+          return function (img) { ctx.drawImage(img, px, py, ts, ts); };
+        }(tx * ts + ox, ty * ts + oy)).catch(function () {}));
       }
     }
     ctx.globalAlpha = op;
@@ -590,15 +593,19 @@
         "<button id='rNext'>Frame ▶</button>" +
         "<button id='rNow'>Jetzt</button>" +
       "</div>" +
-      "<input type='range' id='rSlide' min='0' max='0' value='0' style='width:100%;accent-color:#e02020;margin:12px 0'>" +
+      "<div style='display:flex;align-items:center;gap:10px;margin:12px 0'>" +
+        "<button id='rPlay2' style='min-width:44px;font-size:16px'>⏵</button>" +
+      "<input type='range' id='rSlide' min='0' max='0' value='0' style='flex:1;accent-color:#e02020'>" +
+      "</div>" +
       "<div class='radar-legend'>" +
         "<span style='background:#a8f0a8'></span><span style='background:#31c831'></span>" +
         "<span style='background:#26d2d2'></span><span style='background:#1f6edb'></span>" +
         "<span style='background:#9b2ec9'></span><span style='background:#e33b16'></span>" +
         "<span style='background:#ffd12e'></span>" +
       "</div>" +
-      "<div class='rp-note'>Regenradar von RainViewer · Hintergrundkarte © OpenStreetMap-Mitwirkende, © CARTO · Rückblick der letzten 2 Stunden in 10-Minuten-Schritten plus 30 Minuten Vorhersage · zentriert auf deinen Ort (ca. 50 km Umkreis)</div>";
+      "<div class='rp-note'>Regenradar von RainViewer · Hintergrundkarte © OpenStreetMap-Mitwirkende, © CARTO · Rückblick der letzten 2 Stunden in 10-Minuten-Schritten plus 30 Minuten Vorhersage · zentriert auf deinen Ort</div>";
     document.getElementById("rPlay").addEventListener("click", toggleRadarPlay);
+    document.getElementById("rPlay2").addEventListener("click", toggleRadarPlay);
     document.getElementById("rPrev").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.max(0, rbs.idx - 1); showRadarFrame(); });
     document.getElementById("rNext").addEventListener("click", function () { stopRadarPlay(); rbs.idx = Math.min(rbs.frames.length - 1, rbs.idx + 1); showRadarFrame(); });
     document.getElementById("rNow").addEventListener("click", function () { stopRadarPlay(); jumpToNow(); showRadarFrame(); });
@@ -634,9 +641,9 @@
     ctx.fillStyle = "#0b0c12";
     ctx.fillRect(0, 0, size, size);
     var f = rbs.frames[rbs.idx];
-    var base = drawLayer(ctx, "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", z, lat, lon, size, size, 1);
+    var base = drawLayer(ctx, "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", z, z, lat, lon, size, size, 1);
     if (f) base.then(function () {
-      return drawLayer(ctx, frameUrl(rbs.idx), z, lat, lon, size, size, 0.8);
+      return drawLayer(ctx, frameUrl(rbs.idx), z, rbs.nativeRadar, lat, lon, size, size, 0.8);
     }).catch(function () {});
     var sl = document.getElementById("rSlide");
     if (sl) sl.value = rbs.idx;
@@ -654,7 +661,7 @@
   function toggleRadarPlay() {
     if (rbs.timer) { stopRadarPlay(); return; }
     if (!rbs.frames.length) return;
-    document.getElementById("rPlay").textContent = "⏸️ Stopp";
+    setPlayButtons(true);
     rbs.timer = setInterval(function () {
       rbs.idx = (rbs.idx + 1) % rbs.frames.length;
       showRadarFrame();
@@ -662,8 +669,13 @@
   }
   function stopRadarPlay() {
     if (rbs.timer) { clearInterval(rbs.timer); rbs.timer = null; }
+    setPlayButtons(false);
+  }
+  function setPlayButtons(playing) {
     var b = document.getElementById("rPlay");
-    if (b) b.textContent = "▶️ Abspielen";
+    if (b) b.textContent = playing ? "⏸️ Stopp" : "▶️ Abspielen";
+    var b2 = document.getElementById("rPlay2");
+    if (b2) b2.textContent = playing ? "⏸" : "⏵";
   }
 
   // Fallback: animierte Demo-Ansicht, wenn die API nicht erreichbar ist
